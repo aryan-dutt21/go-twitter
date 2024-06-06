@@ -3,127 +3,97 @@ package main
 //postgres://localhost/aryandutt?sslmode=disable
 
 import (
+	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	tweetv1 "twitter/gen/tweet/v1"
+	"twitter/gen/tweet/v1/tweetv1connect"
 
+	"connectrpc.com/connect"
 	_ "github.com/lib/pq"
 )
 
-type App struct {
+type TweetsServer struct {
 	DB *sql.DB
 }
 
-type Tweet struct {
-	TweetID  int    `json:"tweetId"`
-	Text     string `json:"text"`
-	AuthorName string    `json:"authorUsername"`
+type UserServer struct {
+	DB *sql.DB
 }
 
-type Response struct {
-	Message string `json:"message"`
-}
-
-type TweetsResponse struct {
-	Data []Tweet `json:"data"`
-}
-
-type CreateUserRequest struct {
-	Username    string `json:"username"`
-	Displayname string `json:"displayname"`
-}
-
-func (app *App) setTweet(w http.ResponseWriter, r *http.Request) {
-	username := r.PathValue("username")
-	if username == "" {
-		http.Error(w, "username is required", http.StatusBadRequest)
-		return
+func (s *TweetsServer) GetTweets(
+	ctx context.Context,
+	req *connect.Request[tweetv1.GetTweetsRequest],
+) (*connect.Response[tweetv1.GetTweetsResponse], error) {
+	userId := req.Msg.UserId
+	if userId == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("userId is required"))
 	}
-	if !checkExistingUser(app.DB, username) {
-		http.Error(w, "User does not exist", http.StatusBadRequest)
-		return
-	}
-	var tweet struct {
-		Text string `json:"text"`
-	}
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	err := decoder.Decode(&tweet)
+	rows, err := s.DB.Query("SELECT tweetId, text, authorId FROM tweets WHERE authorId = $1", userId)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	_, queryErr := app.DB.Exec("INSERT INTO tweets (text, authorUsername) VALUES ($1, $2)", tweet.Text, username)
-	if queryErr != nil {
-		http.Error(w, "Error adding tweet", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(Response{Message: fmt.Sprintf("Tweet added to user %s", username)})
-}
-
-func (app *App) getTweets(w http.ResponseWriter, r *http.Request) {
-	username := r.PathValue("username")
-	if username == "" {
-		http.Error(w, "username is required", http.StatusBadRequest)
-		return
-	}
-	rows, err := app.DB.Query("SELECT tweetId, text, authorUsername FROM tweets WHERE authorUsername = $1", username)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	defer rows.Close()
-	
-	var tweets []Tweet
+	var tweets []*tweetv1.GetTweetsResponse_Tweet
 	for rows.Next() {
-		var tweet Tweet
-		if err := rows.Scan(&tweet.TweetID, &tweet.Text, &tweet.AuthorName); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		var tweet tweetv1.GetTweetsResponse_Tweet
+		if err := rows.Scan(&tweet.TweetId, &tweet.Text, &tweet.AuthorId); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, err)
 		}
-		tweets = append(tweets, tweet)
+		tweets = append(tweets, &tweet)
 	}
 	if err := rows.Err(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(TweetsResponse{Data: tweets})
+	res := connect.NewResponse(&tweetv1.GetTweetsResponse{
+		Tweets: tweets,
+	})
+	return res, nil
 }
 
-func (app *App) createUser(w http.ResponseWriter, r *http.Request) {
-	var req CreateUserRequest
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	err := decoder.Decode(&req)
+func (s *TweetsServer) SetTweet(
+	ctx context.Context,
+	req *connect.Request[tweetv1.SetTweetRequest],
+) (*connect.Response[tweetv1.SetTweetResponse], error) {
+	userId, text := req.Msg.UserId, req.Msg.Text
+	if userId == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("userId is required"))
+	}
+	if text == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("text is required"))
+	}
+	if !checkExistingUser(s.DB, userId) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("user does not exist"))
+	}
+	_, err := s.DB.Exec("INSERT INTO tweets (text, authorId) VALUES ($1, $2)", text, userId)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	if req.Username == "" {
-		http.Error(w, "username is required", http.StatusBadRequest)
-		return
-	}
-	if req.Displayname == "" {
-		http.Error(w, "display name is required", http.StatusBadRequest)
-		return
-	}
-	_, err = app.DB.Exec("INSERT INTO users (username, displayname) VALUES ($1, $2)", req.Username, req.Displayname)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(Response{Message: fmt.Sprintf("User %s created", req.Username)})
+	res := connect.NewResponse(&tweetv1.SetTweetResponse{
+		Response: fmt.Sprintf("tweet added to user %v", userId),
+	})
+	return res, nil
 }
 
-//getUserInfo
+func (s *UserServer) CreateUser(
+	ctx context.Context,
+	req *connect.Request[tweetv1.CreateUserRequest],
+) (*connect.Response[tweetv1.CreateUserResponse], error) {
+	username := req.Msg.Username
+	if username == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("username is required"))
+	}
+	_, err := s.DB.Exec("INSERT INTO users (username) VALUES ($1)", username)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	res := connect.NewResponse(&tweetv1.CreateUserResponse{
+		Response: fmt.Sprintf("user %v created", username),
+	})
+	return res, nil
+}
 
 func main() {
 	connStr := "postgresql://twitterDB_owner:HyQCkaZJ7iM6@ep-small-paper-a1s81b5i.ap-southeast-1.aws.neon.tech/twitterDB?sslmode=require"
@@ -133,7 +103,6 @@ func main() {
 	}
 	mux := http.NewServeMux()
 	defer db.Close()
-	app := &App{DB: db}
 	err = createUsersTable(db)
 	if err != nil {
 		fmt.Println(err)
@@ -144,9 +113,10 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	mux.HandleFunc("/setTweet/{username}", app.setTweet)
-	mux.HandleFunc("/createUser", app.createUser)
-	mux.HandleFunc("/getTweets/{username}", app.getTweets)
+	tweetsServer := &TweetsServer{db}
+	userServer := &UserServer{db}
+	mux.Handle(tweetv1connect.NewTweetsServiceHandler(tweetsServer))
+	mux.Handle(tweetv1connect.NewUserServiceHandler(userServer))
 	fmt.Println("Server listening on port 3000")
 	err1 := http.ListenAndServe(":3000", mux)
 	fmt.Println("Error starting server:", err1)
@@ -154,8 +124,8 @@ func main() {
 
 func createUsersTable(db *sql.DB) error {
 	query := `CREATE TABLE IF NOT EXISTS users (
-		username TEXT PRIMARY KEY NOT NULL,
-		displayname TEXT NOT NULL
+		userId SERIAL PRIMARY KEY,
+		username TEXT NOT NULL
 	)`
 	_, err := db.Exec(query)
 	return err
@@ -165,16 +135,16 @@ func createTweetsTable(db *sql.DB) error {
 	query := `CREATE TABLE IF NOT EXISTS tweets (
 		tweetId SERIAL PRIMARY KEY,
 		text TEXT NOT NULL,
-		authorUsername TEXT NOT NULL,
-		FOREIGN KEY (authorUsername) REFERENCES users(username)
+		authorId INTEGER NOT NULL,
+		FOREIGN KEY (authorId) REFERENCES users(userId)
 	)`
 	_, err := db.Exec(query)
 	return err
 }
 
-func checkExistingUser(db *sql.DB, username string) bool {
+func checkExistingUser(db *sql.DB, userId int32) bool {
 	var existingUsername string
-	err := db.QueryRow("SELECT username FROM users WHERE username = $1", username).Scan(&existingUsername)
+	err := db.QueryRow("SELECT username FROM users WHERE userId = $1", userId).Scan(&existingUsername)
 	if err == sql.ErrNoRows {
 		return false
 	} else if err != nil {
