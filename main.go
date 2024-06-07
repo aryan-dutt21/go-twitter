@@ -4,10 +4,11 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
+	"twitter/ent"
+	"twitter/ent/user"
 	tweetv1 "twitter/gen/tweet/v1"
 	"twitter/gen/tweet/v1/tweetv1connect"
 
@@ -16,36 +17,55 @@ import (
 )
 
 type TweetsServer struct {
-	DB *sql.DB
+	Client *ent.Client
 }
 
 type UserServer struct {
-	DB *sql.DB
+	Client *ent.Client
 }
+
+func getUser(ctx context.Context, client *ent.Client, userId string) (*ent.User, error){
+	return client.User.Query().Where(user.ID(userId)).Only(ctx)
+}
+
+func createTweet(ctx context.Context, client *ent.Client, authorId string, text string) (*ent.Tweet, error) {
+	_, err := getUser(ctx, client, authorId)
+	if err != nil {
+		return nil, err
+	}
+	return client.Tweet.Create().SetAuthorID(authorId).SetID(text).SetText(text).Save(ctx)
+}
+
+func createUser(ctx context.Context, client *ent.Client, username string) (*ent.User, error) {
+	return client.User.Create().SetUsername(username).SetID(username).Save(ctx)
+}
+
+func getTweets(ctx context.Context, client *ent.Client, userId string) ([]*ent.Tweet, error) {
+	user, err := getUser(ctx, client, userId)
+	if err != nil {
+		return nil, err
+	}
+	return user.QueryTweets().All(ctx)
+}
+
 
 func (s *TweetsServer) GetTweets(
 	ctx context.Context,
 	req *connect.Request[tweetv1.GetTweetsRequest],
 ) (*connect.Response[tweetv1.GetTweetsResponse], error) {
 	userId := req.Msg.UserId
-	if userId == 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("userId is required"))
-	}
-	rows, err := s.DB.Query("SELECT tweetId, text, authorId FROM tweets WHERE authorId = $1", userId)
+	queryTweets, err := getTweets(ctx, s.Client, (userId))
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	defer rows.Close()
 	var tweets []*tweetv1.GetTweetsResponse_Tweet
-	for rows.Next() {
-		var tweet tweetv1.GetTweetsResponse_Tweet
-		if err := rows.Scan(&tweet.TweetId, &tweet.Text, &tweet.AuthorId); err != nil {
-			return nil, connect.NewError(connect.CodeInternal, err)
+	for _, queryTweet := range queryTweets {
+		tweet := &tweetv1.GetTweetsResponse_Tweet{
+			AuthorId: (queryTweet.AuthorID),
+			Text:     queryTweet.Text,
+			TweetId:  (queryTweet.ID),
 		}
-		tweets = append(tweets, &tweet)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		tweets = append(tweets, tweet)
 	}
 	res := connect.NewResponse(&tweetv1.GetTweetsResponse{
 		Tweets: tweets,
@@ -58,21 +78,12 @@ func (s *TweetsServer) SetTweet(
 	req *connect.Request[tweetv1.SetTweetRequest],
 ) (*connect.Response[tweetv1.SetTweetResponse], error) {
 	userId, text := req.Msg.UserId, req.Msg.Text
-	if userId == 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("userId is required"))
-	}
-	if text == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("text is required"))
-	}
-	if !checkExistingUser(s.DB, userId) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("user does not exist"))
-	}
-	_, err := s.DB.Exec("INSERT INTO tweets (text, authorId) VALUES ($1, $2)", text, userId)
+	tweet, err := createTweet(ctx, s.Client, (userId), text)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	res := connect.NewResponse(&tweetv1.SetTweetResponse{
-		Response: fmt.Sprintf("tweet added to user %v", userId),
+		Response: fmt.Sprintf("tweet %v added", tweet),
 	})
 	return res, nil
 }
@@ -82,74 +93,32 @@ func (s *UserServer) CreateUser(
 	req *connect.Request[tweetv1.CreateUserRequest],
 ) (*connect.Response[tweetv1.CreateUserResponse], error) {
 	username := req.Msg.Username
-	if username == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("username is required"))
-	}
-	_, err := s.DB.Exec("INSERT INTO users (username) VALUES ($1)", username)
+	user, err := createUser(ctx, s.Client, username)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	res := connect.NewResponse(&tweetv1.CreateUserResponse{
-		Response: fmt.Sprintf("user %v created", username),
+		Response: fmt.Sprintf("user %v created", user),
 	})
 	return res, nil
 }
 
 func main() {
 	connStr := "postgresql://twitterDB_owner:HyQCkaZJ7iM6@ep-small-paper-a1s81b5i.ap-southeast-1.aws.neon.tech/twitterDB?sslmode=require"
-	db, err := sql.Open("postgres", connStr)
+	client, err := ent.Open("postgres", connStr)
 	if err != nil {
-		log.Fatal("Error connecting to DB", err)
+		log.Fatal("failed opening connection to postgres", err)
 	}
+	defer client.Close()
+	if err := client.Schema.Create(context.Background()); err != nil {
+		log.Fatal("failed creating schema resources", err)
+	}
+	tweetsServer := &TweetsServer{client}
+	userServer := &UserServer{client}
 	mux := http.NewServeMux()
-	defer db.Close()
-	err = createUsersTable(db)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	err = createTweetsTable(db)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	tweetsServer := &TweetsServer{db}
-	userServer := &UserServer{db}
 	mux.Handle(tweetv1connect.NewTweetsServiceHandler(tweetsServer))
 	mux.Handle(tweetv1connect.NewUserServiceHandler(userServer))
 	fmt.Println("Server listening on port 3000")
 	err1 := http.ListenAndServe(":3000", mux)
 	fmt.Println("Error starting server:", err1)
-}
-
-func createUsersTable(db *sql.DB) error {
-	query := `CREATE TABLE IF NOT EXISTS users (
-		userId SERIAL PRIMARY KEY,
-		username TEXT NOT NULL
-	)`
-	_, err := db.Exec(query)
-	return err
-}
-
-func createTweetsTable(db *sql.DB) error {
-	query := `CREATE TABLE IF NOT EXISTS tweets (
-		tweetId SERIAL PRIMARY KEY,
-		text TEXT NOT NULL,
-		authorId INTEGER NOT NULL,
-		FOREIGN KEY (authorId) REFERENCES users(userId)
-	)`
-	_, err := db.Exec(query)
-	return err
-}
-
-func checkExistingUser(db *sql.DB, userId int32) bool {
-	var existingUsername string
-	err := db.QueryRow("SELECT username FROM users WHERE userId = $1", userId).Scan(&existingUsername)
-	if err == sql.ErrNoRows {
-		return false
-	} else if err != nil {
-		log.Printf("Error checking for existing user: %v", err)
-		return false
-	}
-	return true
 }
