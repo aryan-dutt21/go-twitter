@@ -10,9 +10,9 @@ import (
 var (
 	// TweetsColumns holds the columns for the "tweets" table.
 	TweetsColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "text", Type: field.TypeString},
-		{Name: "author_id", Type: field.TypeString},
+		{Name: "user_tweets", Type: field.TypeInt, Nullable: true},
 	}
 	// TweetsTable holds the schema information for the "tweets" table.
 	TweetsTable = &schema.Table{
@@ -24,13 +24,13 @@ var (
 				Symbol:     "tweets_users_tweets",
 				Columns:    []*schema.Column{TweetsColumns[2]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
-				OnDelete:   schema.NoAction,
+				OnDelete:   schema.SetNull,
 			},
 		},
 	}
 	// UsersColumns holds the columns for the "users" table.
 	UsersColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "username", Type: field.TypeString},
 	}
 	// UsersTable holds the schema information for the "users" table.

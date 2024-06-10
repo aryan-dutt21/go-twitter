@@ -24,7 +24,7 @@ const (
 	// It exists in this package in order to avoid circular dependency with the "tweet" package.
 	TweetsInverseTable = "tweets"
 	// TweetsColumn is the table column denoting the tweets relation/edge.
-	TweetsColumn = "author_id"
+	TweetsColumn = "user_tweets"
 )
 
 // Columns holds all SQL columns for user fields.
@@ -46,8 +46,6 @@ func ValidColumn(column string) bool {
 var (
 	// UsernameValidator is a validator for the "username" field. It is called by the builders before save.
 	UsernameValidator func(string) error
-	// IDValidator is a validator for the "id" field. It is called by the builders before save.
-	IDValidator func(string) error
 )
 
 // OrderOption defines the ordering options for the User queries.

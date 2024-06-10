@@ -16,8 +16,6 @@ func (Tweet) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("text").
 			NotEmpty(),
-			field.String("author_id"),
-			field.String("id").Immutable().NotEmpty().Unique(),
 	}
 }
 
@@ -26,6 +24,6 @@ func (Tweet) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.From("author", User.Type).
 			Ref("tweets").
-			Unique().Field("author_id").Required(),
+			Unique(),
 	}
 }

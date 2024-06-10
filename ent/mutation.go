@@ -33,10 +33,10 @@ type TweetMutation struct {
 	config
 	op            Op
 	typ           string
-	id            *string
+	id            *int
 	text          *string
 	clearedFields map[string]struct{}
-	author        *string
+	author        *int
 	clearedauthor bool
 	done          bool
 	oldValue      func(context.Context) (*Tweet, error)
@@ -63,7 +63,7 @@ func newTweetMutation(c config, op Op, opts ...tweetOption) *TweetMutation {
 }
 
 // withTweetID sets the ID field of the mutation.
-func withTweetID(id string) tweetOption {
+func withTweetID(id int) tweetOption {
 	return func(m *TweetMutation) {
 		var (
 			err   error
@@ -113,15 +113,9 @@ func (m TweetMutation) Tx() (*Tx, error) {
 	return tx, nil
 }
 
-// SetID sets the value of the id field. Note that this
-// operation is only accepted on creation of Tweet entities.
-func (m *TweetMutation) SetID(id string) {
-	m.id = &id
-}
-
 // ID returns the ID value in the mutation. Note that the ID is only available
 // if it was provided to the builder or after it was returned from the database.
-func (m *TweetMutation) ID() (id string, exists bool) {
+func (m *TweetMutation) ID() (id int, exists bool) {
 	if m.id == nil {
 		return
 	}
@@ -132,12 +126,12 @@ func (m *TweetMutation) ID() (id string, exists bool) {
 // That means, if the mutation is applied within a transaction with an isolation level such
 // as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
 // or updated by the mutation.
-func (m *TweetMutation) IDs(ctx context.Context) ([]string, error) {
+func (m *TweetMutation) IDs(ctx context.Context) ([]int, error) {
 	switch {
 	case m.op.Is(OpUpdateOne | OpDeleteOne):
 		id, exists := m.ID()
 		if exists {
-			return []string{id}, nil
+			return []int{id}, nil
 		}
 		fallthrough
 	case m.op.Is(OpUpdate | OpDelete):
@@ -183,46 +177,14 @@ func (m *TweetMutation) ResetText() {
 	m.text = nil
 }
 
-// SetAuthorID sets the "author_id" field.
-func (m *TweetMutation) SetAuthorID(s string) {
-	m.author = &s
-}
-
-// AuthorID returns the value of the "author_id" field in the mutation.
-func (m *TweetMutation) AuthorID() (r string, exists bool) {
-	v := m.author
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldAuthorID returns the old "author_id" field's value of the Tweet entity.
-// If the Tweet object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TweetMutation) OldAuthorID(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldAuthorID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldAuthorID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldAuthorID: %w", err)
-	}
-	return oldValue.AuthorID, nil
-}
-
-// ResetAuthorID resets all changes to the "author_id" field.
-func (m *TweetMutation) ResetAuthorID() {
-	m.author = nil
+// SetAuthorID sets the "author" edge to the User entity by id.
+func (m *TweetMutation) SetAuthorID(id int) {
+	m.author = &id
 }
 
 // ClearAuthor clears the "author" edge to the User entity.
 func (m *TweetMutation) ClearAuthor() {
 	m.clearedauthor = true
-	m.clearedFields[tweet.FieldAuthorID] = struct{}{}
 }
 
 // AuthorCleared reports if the "author" edge to the User entity was cleared.
@@ -230,10 +192,18 @@ func (m *TweetMutation) AuthorCleared() bool {
 	return m.clearedauthor
 }
 
+// AuthorID returns the "author" edge ID in the mutation.
+func (m *TweetMutation) AuthorID() (id int, exists bool) {
+	if m.author != nil {
+		return *m.author, true
+	}
+	return
+}
+
 // AuthorIDs returns the "author" edge IDs in the mutation.
 // Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
 // AuthorID instead. It exists only for internal usage by the builders.
-func (m *TweetMutation) AuthorIDs() (ids []string) {
+func (m *TweetMutation) AuthorIDs() (ids []int) {
 	if id := m.author; id != nil {
 		ids = append(ids, *id)
 	}
@@ -280,12 +250,9 @@ func (m *TweetMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TweetMutation) Fields() []string {
-	fields := make([]string, 0, 2)
+	fields := make([]string, 0, 1)
 	if m.text != nil {
 		fields = append(fields, tweet.FieldText)
-	}
-	if m.author != nil {
-		fields = append(fields, tweet.FieldAuthorID)
 	}
 	return fields
 }
@@ -297,8 +264,6 @@ func (m *TweetMutation) Field(name string) (ent.Value, bool) {
 	switch name {
 	case tweet.FieldText:
 		return m.Text()
-	case tweet.FieldAuthorID:
-		return m.AuthorID()
 	}
 	return nil, false
 }
@@ -310,8 +275,6 @@ func (m *TweetMutation) OldField(ctx context.Context, name string) (ent.Value, e
 	switch name {
 	case tweet.FieldText:
 		return m.OldText(ctx)
-	case tweet.FieldAuthorID:
-		return m.OldAuthorID(ctx)
 	}
 	return nil, fmt.Errorf("unknown Tweet field %s", name)
 }
@@ -327,13 +290,6 @@ func (m *TweetMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetText(v)
-		return nil
-	case tweet.FieldAuthorID:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetAuthorID(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Tweet field %s", name)
@@ -386,9 +342,6 @@ func (m *TweetMutation) ResetField(name string) error {
 	switch name {
 	case tweet.FieldText:
 		m.ResetText()
-		return nil
-	case tweet.FieldAuthorID:
-		m.ResetAuthorID()
 		return nil
 	}
 	return fmt.Errorf("unknown Tweet field %s", name)
@@ -473,11 +426,11 @@ type UserMutation struct {
 	config
 	op            Op
 	typ           string
-	id            *string
+	id            *int
 	username      *string
 	clearedFields map[string]struct{}
-	tweets        map[string]struct{}
-	removedtweets map[string]struct{}
+	tweets        map[int]struct{}
+	removedtweets map[int]struct{}
 	clearedtweets bool
 	done          bool
 	oldValue      func(context.Context) (*User, error)
@@ -504,7 +457,7 @@ func newUserMutation(c config, op Op, opts ...userOption) *UserMutation {
 }
 
 // withUserID sets the ID field of the mutation.
-func withUserID(id string) userOption {
+func withUserID(id int) userOption {
 	return func(m *UserMutation) {
 		var (
 			err   error
@@ -554,15 +507,9 @@ func (m UserMutation) Tx() (*Tx, error) {
 	return tx, nil
 }
 
-// SetID sets the value of the id field. Note that this
-// operation is only accepted on creation of User entities.
-func (m *UserMutation) SetID(id string) {
-	m.id = &id
-}
-
 // ID returns the ID value in the mutation. Note that the ID is only available
 // if it was provided to the builder or after it was returned from the database.
-func (m *UserMutation) ID() (id string, exists bool) {
+func (m *UserMutation) ID() (id int, exists bool) {
 	if m.id == nil {
 		return
 	}
@@ -573,12 +520,12 @@ func (m *UserMutation) ID() (id string, exists bool) {
 // That means, if the mutation is applied within a transaction with an isolation level such
 // as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
 // or updated by the mutation.
-func (m *UserMutation) IDs(ctx context.Context) ([]string, error) {
+func (m *UserMutation) IDs(ctx context.Context) ([]int, error) {
 	switch {
 	case m.op.Is(OpUpdateOne | OpDeleteOne):
 		id, exists := m.ID()
 		if exists {
-			return []string{id}, nil
+			return []int{id}, nil
 		}
 		fallthrough
 	case m.op.Is(OpUpdate | OpDelete):
@@ -625,9 +572,9 @@ func (m *UserMutation) ResetUsername() {
 }
 
 // AddTweetIDs adds the "tweets" edge to the Tweet entity by ids.
-func (m *UserMutation) AddTweetIDs(ids ...string) {
+func (m *UserMutation) AddTweetIDs(ids ...int) {
 	if m.tweets == nil {
-		m.tweets = make(map[string]struct{})
+		m.tweets = make(map[int]struct{})
 	}
 	for i := range ids {
 		m.tweets[ids[i]] = struct{}{}
@@ -645,9 +592,9 @@ func (m *UserMutation) TweetsCleared() bool {
 }
 
 // RemoveTweetIDs removes the "tweets" edge to the Tweet entity by IDs.
-func (m *UserMutation) RemoveTweetIDs(ids ...string) {
+func (m *UserMutation) RemoveTweetIDs(ids ...int) {
 	if m.removedtweets == nil {
-		m.removedtweets = make(map[string]struct{})
+		m.removedtweets = make(map[int]struct{})
 	}
 	for i := range ids {
 		delete(m.tweets, ids[i])
@@ -656,7 +603,7 @@ func (m *UserMutation) RemoveTweetIDs(ids ...string) {
 }
 
 // RemovedTweets returns the removed IDs of the "tweets" edge to the Tweet entity.
-func (m *UserMutation) RemovedTweetsIDs() (ids []string) {
+func (m *UserMutation) RemovedTweetsIDs() (ids []int) {
 	for id := range m.removedtweets {
 		ids = append(ids, id)
 	}
@@ -664,7 +611,7 @@ func (m *UserMutation) RemovedTweetsIDs() (ids []string) {
 }
 
 // TweetsIDs returns the "tweets" edge IDs in the mutation.
-func (m *UserMutation) TweetsIDs() (ids []string) {
+func (m *UserMutation) TweetsIDs() (ids []int) {
 	for id := range m.tweets {
 		ids = append(ids, id)
 	}

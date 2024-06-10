@@ -23,6 +23,7 @@ type TweetQuery struct {
 	inters     []Interceptor
 	predicates []predicate.Tweet
 	withAuthor *UserQuery
+	withFKs    bool
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -105,8 +106,8 @@ func (tq *TweetQuery) FirstX(ctx context.Context) *Tweet {
 
 // FirstID returns the first Tweet ID from the query.
 // Returns a *NotFoundError when no Tweet ID was found.
-func (tq *TweetQuery) FirstID(ctx context.Context) (id string, err error) {
-	var ids []string
+func (tq *TweetQuery) FirstID(ctx context.Context) (id int, err error) {
+	var ids []int
 	if ids, err = tq.Limit(1).IDs(setContextOp(ctx, tq.ctx, "FirstID")); err != nil {
 		return
 	}
@@ -118,7 +119,7 @@ func (tq *TweetQuery) FirstID(ctx context.Context) (id string, err error) {
 }
 
 // FirstIDX is like FirstID, but panics if an error occurs.
-func (tq *TweetQuery) FirstIDX(ctx context.Context) string {
+func (tq *TweetQuery) FirstIDX(ctx context.Context) int {
 	id, err := tq.FirstID(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
@@ -156,8 +157,8 @@ func (tq *TweetQuery) OnlyX(ctx context.Context) *Tweet {
 // OnlyID is like Only, but returns the only Tweet ID in the query.
 // Returns a *NotSingularError when more than one Tweet ID is found.
 // Returns a *NotFoundError when no entities are found.
-func (tq *TweetQuery) OnlyID(ctx context.Context) (id string, err error) {
-	var ids []string
+func (tq *TweetQuery) OnlyID(ctx context.Context) (id int, err error) {
+	var ids []int
 	if ids, err = tq.Limit(2).IDs(setContextOp(ctx, tq.ctx, "OnlyID")); err != nil {
 		return
 	}
@@ -173,7 +174,7 @@ func (tq *TweetQuery) OnlyID(ctx context.Context) (id string, err error) {
 }
 
 // OnlyIDX is like OnlyID, but panics if an error occurs.
-func (tq *TweetQuery) OnlyIDX(ctx context.Context) string {
+func (tq *TweetQuery) OnlyIDX(ctx context.Context) int {
 	id, err := tq.OnlyID(ctx)
 	if err != nil {
 		panic(err)
@@ -201,7 +202,7 @@ func (tq *TweetQuery) AllX(ctx context.Context) []*Tweet {
 }
 
 // IDs executes the query and returns a list of Tweet IDs.
-func (tq *TweetQuery) IDs(ctx context.Context) (ids []string, err error) {
+func (tq *TweetQuery) IDs(ctx context.Context) (ids []int, err error) {
 	if tq.ctx.Unique == nil && tq.path != nil {
 		tq.Unique(true)
 	}
@@ -213,7 +214,7 @@ func (tq *TweetQuery) IDs(ctx context.Context) (ids []string, err error) {
 }
 
 // IDsX is like IDs, but panics if an error occurs.
-func (tq *TweetQuery) IDsX(ctx context.Context) []string {
+func (tq *TweetQuery) IDsX(ctx context.Context) []int {
 	ids, err := tq.IDs(ctx)
 	if err != nil {
 		panic(err)
@@ -368,11 +369,18 @@ func (tq *TweetQuery) prepareQuery(ctx context.Context) error {
 func (tq *TweetQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tweet, error) {
 	var (
 		nodes       = []*Tweet{}
+		withFKs     = tq.withFKs
 		_spec       = tq.querySpec()
 		loadedTypes = [1]bool{
 			tq.withAuthor != nil,
 		}
 	)
+	if tq.withAuthor != nil {
+		withFKs = true
+	}
+	if withFKs {
+		_spec.Node.Columns = append(_spec.Node.Columns, tweet.ForeignKeys...)
+	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*Tweet).scanValues(nil, columns)
 	}
@@ -401,10 +409,13 @@ func (tq *TweetQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tweet,
 }
 
 func (tq *TweetQuery) loadAuthor(ctx context.Context, query *UserQuery, nodes []*Tweet, init func(*Tweet), assign func(*Tweet, *User)) error {
-	ids := make([]string, 0, len(nodes))
-	nodeids := make(map[string][]*Tweet)
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*Tweet)
 	for i := range nodes {
-		fk := nodes[i].AuthorID
+		if nodes[i].user_tweets == nil {
+			continue
+		}
+		fk := *nodes[i].user_tweets
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -421,7 +432,7 @@ func (tq *TweetQuery) loadAuthor(ctx context.Context, query *UserQuery, nodes []
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "author_id" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "user_tweets" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -440,7 +451,7 @@ func (tq *TweetQuery) sqlCount(ctx context.Context) (int, error) {
 }
 
 func (tq *TweetQuery) querySpec() *sqlgraph.QuerySpec {
-	_spec := sqlgraph.NewQuerySpec(tweet.Table, tweet.Columns, sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeString))
+	_spec := sqlgraph.NewQuerySpec(tweet.Table, tweet.Columns, sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeInt))
 	_spec.From = tq.sql
 	if unique := tq.ctx.Unique; unique != nil {
 		_spec.Unique = *unique
@@ -454,9 +465,6 @@ func (tq *TweetQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != tweet.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
-		}
-		if tq.withAuthor != nil {
-			_spec.Node.AddColumnOnce(tweet.FieldAuthorID)
 		}
 	}
 	if ps := tq.predicates; len(ps) > 0 {

@@ -42,16 +42,16 @@ func (tu *TweetUpdate) SetNillableText(s *string) *TweetUpdate {
 	return tu
 }
 
-// SetAuthorID sets the "author_id" field.
-func (tu *TweetUpdate) SetAuthorID(s string) *TweetUpdate {
-	tu.mutation.SetAuthorID(s)
+// SetAuthorID sets the "author" edge to the User entity by ID.
+func (tu *TweetUpdate) SetAuthorID(id int) *TweetUpdate {
+	tu.mutation.SetAuthorID(id)
 	return tu
 }
 
-// SetNillableAuthorID sets the "author_id" field if the given value is not nil.
-func (tu *TweetUpdate) SetNillableAuthorID(s *string) *TweetUpdate {
-	if s != nil {
-		tu.SetAuthorID(*s)
+// SetNillableAuthorID sets the "author" edge to the User entity by ID if the given value is not nil.
+func (tu *TweetUpdate) SetNillableAuthorID(id *int) *TweetUpdate {
+	if id != nil {
+		tu = tu.SetAuthorID(*id)
 	}
 	return tu
 }
@@ -106,9 +106,6 @@ func (tu *TweetUpdate) check() error {
 			return &ValidationError{Name: "text", err: fmt.Errorf(`ent: validator failed for field "Tweet.text": %w`, err)}
 		}
 	}
-	if _, ok := tu.mutation.AuthorID(); tu.mutation.AuthorCleared() && !ok {
-		return errors.New(`ent: clearing a required unique edge "Tweet.author"`)
-	}
 	return nil
 }
 
@@ -116,7 +113,7 @@ func (tu *TweetUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := tu.check(); err != nil {
 		return n, err
 	}
-	_spec := sqlgraph.NewUpdateSpec(tweet.Table, tweet.Columns, sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeString))
+	_spec := sqlgraph.NewUpdateSpec(tweet.Table, tweet.Columns, sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeInt))
 	if ps := tu.mutation.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
 			for i := range ps {
@@ -135,7 +132,7 @@ func (tu *TweetUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Columns: []string{tweet.AuthorColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeString),
+				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
@@ -148,7 +145,7 @@ func (tu *TweetUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Columns: []string{tweet.AuthorColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeString),
+				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -190,16 +187,16 @@ func (tuo *TweetUpdateOne) SetNillableText(s *string) *TweetUpdateOne {
 	return tuo
 }
 
-// SetAuthorID sets the "author_id" field.
-func (tuo *TweetUpdateOne) SetAuthorID(s string) *TweetUpdateOne {
-	tuo.mutation.SetAuthorID(s)
+// SetAuthorID sets the "author" edge to the User entity by ID.
+func (tuo *TweetUpdateOne) SetAuthorID(id int) *TweetUpdateOne {
+	tuo.mutation.SetAuthorID(id)
 	return tuo
 }
 
-// SetNillableAuthorID sets the "author_id" field if the given value is not nil.
-func (tuo *TweetUpdateOne) SetNillableAuthorID(s *string) *TweetUpdateOne {
-	if s != nil {
-		tuo.SetAuthorID(*s)
+// SetNillableAuthorID sets the "author" edge to the User entity by ID if the given value is not nil.
+func (tuo *TweetUpdateOne) SetNillableAuthorID(id *int) *TweetUpdateOne {
+	if id != nil {
+		tuo = tuo.SetAuthorID(*id)
 	}
 	return tuo
 }
@@ -267,9 +264,6 @@ func (tuo *TweetUpdateOne) check() error {
 			return &ValidationError{Name: "text", err: fmt.Errorf(`ent: validator failed for field "Tweet.text": %w`, err)}
 		}
 	}
-	if _, ok := tuo.mutation.AuthorID(); tuo.mutation.AuthorCleared() && !ok {
-		return errors.New(`ent: clearing a required unique edge "Tweet.author"`)
-	}
 	return nil
 }
 
@@ -277,7 +271,7 @@ func (tuo *TweetUpdateOne) sqlSave(ctx context.Context) (_node *Tweet, err error
 	if err := tuo.check(); err != nil {
 		return _node, err
 	}
-	_spec := sqlgraph.NewUpdateSpec(tweet.Table, tweet.Columns, sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeString))
+	_spec := sqlgraph.NewUpdateSpec(tweet.Table, tweet.Columns, sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeInt))
 	id, ok := tuo.mutation.ID()
 	if !ok {
 		return nil, &ValidationError{Name: "id", err: errors.New(`ent: missing "Tweet.id" for update`)}
@@ -313,7 +307,7 @@ func (tuo *TweetUpdateOne) sqlSave(ctx context.Context) (_node *Tweet, err error
 			Columns: []string{tweet.AuthorColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeString),
+				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
@@ -326,7 +320,7 @@ func (tuo *TweetUpdateOne) sqlSave(ctx context.Context) (_node *Tweet, err error
 			Columns: []string{tweet.AuthorColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeString),
+				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

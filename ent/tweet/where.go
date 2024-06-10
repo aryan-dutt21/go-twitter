@@ -10,68 +10,53 @@ import (
 )
 
 // ID filters vertices based on their ID field.
-func ID(id string) predicate.Tweet {
+func ID(id int) predicate.Tweet {
 	return predicate.Tweet(sql.FieldEQ(FieldID, id))
 }
 
 // IDEQ applies the EQ predicate on the ID field.
-func IDEQ(id string) predicate.Tweet {
+func IDEQ(id int) predicate.Tweet {
 	return predicate.Tweet(sql.FieldEQ(FieldID, id))
 }
 
 // IDNEQ applies the NEQ predicate on the ID field.
-func IDNEQ(id string) predicate.Tweet {
+func IDNEQ(id int) predicate.Tweet {
 	return predicate.Tweet(sql.FieldNEQ(FieldID, id))
 }
 
 // IDIn applies the In predicate on the ID field.
-func IDIn(ids ...string) predicate.Tweet {
+func IDIn(ids ...int) predicate.Tweet {
 	return predicate.Tweet(sql.FieldIn(FieldID, ids...))
 }
 
 // IDNotIn applies the NotIn predicate on the ID field.
-func IDNotIn(ids ...string) predicate.Tweet {
+func IDNotIn(ids ...int) predicate.Tweet {
 	return predicate.Tweet(sql.FieldNotIn(FieldID, ids...))
 }
 
 // IDGT applies the GT predicate on the ID field.
-func IDGT(id string) predicate.Tweet {
+func IDGT(id int) predicate.Tweet {
 	return predicate.Tweet(sql.FieldGT(FieldID, id))
 }
 
 // IDGTE applies the GTE predicate on the ID field.
-func IDGTE(id string) predicate.Tweet {
+func IDGTE(id int) predicate.Tweet {
 	return predicate.Tweet(sql.FieldGTE(FieldID, id))
 }
 
 // IDLT applies the LT predicate on the ID field.
-func IDLT(id string) predicate.Tweet {
+func IDLT(id int) predicate.Tweet {
 	return predicate.Tweet(sql.FieldLT(FieldID, id))
 }
 
 // IDLTE applies the LTE predicate on the ID field.
-func IDLTE(id string) predicate.Tweet {
+func IDLTE(id int) predicate.Tweet {
 	return predicate.Tweet(sql.FieldLTE(FieldID, id))
-}
-
-// IDEqualFold applies the EqualFold predicate on the ID field.
-func IDEqualFold(id string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldEqualFold(FieldID, id))
-}
-
-// IDContainsFold applies the ContainsFold predicate on the ID field.
-func IDContainsFold(id string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldContainsFold(FieldID, id))
 }
 
 // Text applies equality check predicate on the "text" field. It's identical to TextEQ.
 func Text(v string) predicate.Tweet {
 	return predicate.Tweet(sql.FieldEQ(FieldText, v))
-}
-
-// AuthorID applies equality check predicate on the "author_id" field. It's identical to AuthorIDEQ.
-func AuthorID(v string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldEQ(FieldAuthorID, v))
 }
 
 // TextEQ applies the EQ predicate on the "text" field.
@@ -137,71 +122,6 @@ func TextEqualFold(v string) predicate.Tweet {
 // TextContainsFold applies the ContainsFold predicate on the "text" field.
 func TextContainsFold(v string) predicate.Tweet {
 	return predicate.Tweet(sql.FieldContainsFold(FieldText, v))
-}
-
-// AuthorIDEQ applies the EQ predicate on the "author_id" field.
-func AuthorIDEQ(v string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldEQ(FieldAuthorID, v))
-}
-
-// AuthorIDNEQ applies the NEQ predicate on the "author_id" field.
-func AuthorIDNEQ(v string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldNEQ(FieldAuthorID, v))
-}
-
-// AuthorIDIn applies the In predicate on the "author_id" field.
-func AuthorIDIn(vs ...string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldIn(FieldAuthorID, vs...))
-}
-
-// AuthorIDNotIn applies the NotIn predicate on the "author_id" field.
-func AuthorIDNotIn(vs ...string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldNotIn(FieldAuthorID, vs...))
-}
-
-// AuthorIDGT applies the GT predicate on the "author_id" field.
-func AuthorIDGT(v string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldGT(FieldAuthorID, v))
-}
-
-// AuthorIDGTE applies the GTE predicate on the "author_id" field.
-func AuthorIDGTE(v string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldGTE(FieldAuthorID, v))
-}
-
-// AuthorIDLT applies the LT predicate on the "author_id" field.
-func AuthorIDLT(v string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldLT(FieldAuthorID, v))
-}
-
-// AuthorIDLTE applies the LTE predicate on the "author_id" field.
-func AuthorIDLTE(v string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldLTE(FieldAuthorID, v))
-}
-
-// AuthorIDContains applies the Contains predicate on the "author_id" field.
-func AuthorIDContains(v string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldContains(FieldAuthorID, v))
-}
-
-// AuthorIDHasPrefix applies the HasPrefix predicate on the "author_id" field.
-func AuthorIDHasPrefix(v string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldHasPrefix(FieldAuthorID, v))
-}
-
-// AuthorIDHasSuffix applies the HasSuffix predicate on the "author_id" field.
-func AuthorIDHasSuffix(v string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldHasSuffix(FieldAuthorID, v))
-}
-
-// AuthorIDEqualFold applies the EqualFold predicate on the "author_id" field.
-func AuthorIDEqualFold(v string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldEqualFold(FieldAuthorID, v))
-}
-
-// AuthorIDContainsFold applies the ContainsFold predicate on the "author_id" field.
-func AuthorIDContainsFold(v string) predicate.Tweet {
-	return predicate.Tweet(sql.FieldContainsFold(FieldAuthorID, v))
 }
 
 // HasAuthor applies the HasEdge predicate on the "author" edge.

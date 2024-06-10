@@ -14,8 +14,6 @@ const (
 	FieldID = "id"
 	// FieldText holds the string denoting the text field in the database.
 	FieldText = "text"
-	// FieldAuthorID holds the string denoting the author_id field in the database.
-	FieldAuthorID = "author_id"
 	// EdgeAuthor holds the string denoting the author edge name in mutations.
 	EdgeAuthor = "author"
 	// Table holds the table name of the tweet in the database.
@@ -26,14 +24,19 @@ const (
 	// It exists in this package in order to avoid circular dependency with the "user" package.
 	AuthorInverseTable = "users"
 	// AuthorColumn is the table column denoting the author relation/edge.
-	AuthorColumn = "author_id"
+	AuthorColumn = "user_tweets"
 )
 
 // Columns holds all SQL columns for tweet fields.
 var Columns = []string{
 	FieldID,
 	FieldText,
-	FieldAuthorID,
+}
+
+// ForeignKeys holds the SQL foreign-keys that are owned by the "tweets"
+// table and are not defined as standalone fields in the schema.
+var ForeignKeys = []string{
+	"user_tweets",
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -43,14 +46,17 @@ func ValidColumn(column string) bool {
 			return true
 		}
 	}
+	for i := range ForeignKeys {
+		if column == ForeignKeys[i] {
+			return true
+		}
+	}
 	return false
 }
 
 var (
 	// TextValidator is a validator for the "text" field. It is called by the builders before save.
 	TextValidator func(string) error
-	// IDValidator is a validator for the "id" field. It is called by the builders before save.
-	IDValidator func(string) error
 )
 
 // OrderOption defines the ordering options for the Tweet queries.
@@ -64,11 +70,6 @@ func ByID(opts ...sql.OrderTermOption) OrderOption {
 // ByText orders the results by the text field.
 func ByText(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldText, opts...).ToFunc()
-}
-
-// ByAuthorID orders the results by the author_id field.
-func ByAuthorID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldAuthorID, opts...).ToFunc()
 }
 
 // ByAuthorField orders the results by author field.

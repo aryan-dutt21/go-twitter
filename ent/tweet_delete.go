@@ -40,7 +40,7 @@ func (td *TweetDelete) ExecX(ctx context.Context) int {
 }
 
 func (td *TweetDelete) sqlExec(ctx context.Context) (int, error) {
-	_spec := sqlgraph.NewDeleteSpec(tweet.Table, sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeString))
+	_spec := sqlgraph.NewDeleteSpec(tweet.Table, sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeInt))
 	if ps := td.mutation.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
 			for i := range ps {

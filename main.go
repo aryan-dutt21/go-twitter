@@ -1,13 +1,12 @@
 package main
 
-//postgres://localhost/aryandutt?sslmode=disable
-
 import (
 	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"twitter/ent"
+	"twitter/ent/tweet"
 	"twitter/ent/user"
 	tweetv1 "twitter/gen/tweet/v1"
 	"twitter/gen/tweet/v1/tweetv1connect"
@@ -24,53 +23,27 @@ type UserServer struct {
 	Client *ent.Client
 }
 
-func getUser(ctx context.Context, client *ent.Client, userId string) (*ent.User, error){
-	return client.User.Query().Where(user.ID(userId)).Only(ctx)
-}
-
-func createTweet(ctx context.Context, client *ent.Client, authorId string, text string) (*ent.Tweet, error) {
-	_, err := getUser(ctx, client, authorId)
-	if err != nil {
-		return nil, err
-	}
-	return client.Tweet.Create().SetAuthorID(authorId).SetID(text).SetText(text).Save(ctx)
-}
-
-func createUser(ctx context.Context, client *ent.Client, username string) (*ent.User, error) {
-	return client.User.Create().SetUsername(username).SetID(username).Save(ctx)
-}
-
-func getTweets(ctx context.Context, client *ent.Client, userId string) ([]*ent.Tweet, error) {
-	user, err := getUser(ctx, client, userId)
-	if err != nil {
-		return nil, err
-	}
-	return user.QueryTweets().All(ctx)
-}
-
-
 func (s *TweetsServer) GetTweets(
 	ctx context.Context,
 	req *connect.Request[tweetv1.GetTweetsRequest],
 ) (*connect.Response[tweetv1.GetTweetsResponse], error) {
 	userId := req.Msg.UserId
-	queryTweets, err := getTweets(ctx, s.Client, (userId))
+	queryTweets, err := s.Client.Tweet.Query().Where(tweet.HasAuthorWith(user.ID(int(userId)))).WithAuthor().All(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	var tweets []*tweetv1.GetTweetsResponse_Tweet
 	for _, queryTweet := range queryTweets {
 		tweet := &tweetv1.GetTweetsResponse_Tweet{
-			AuthorId: (queryTweet.AuthorID),
+			AuthorId: int32(queryTweet.Edges.Author.ID),
 			Text:     queryTweet.Text,
-			TweetId:  (queryTweet.ID),
+			TweetId:  int32(queryTweet.ID),
 		}
 		tweets = append(tweets, tweet)
 	}
-	res := connect.NewResponse(&tweetv1.GetTweetsResponse{
+	return connect.NewResponse(&tweetv1.GetTweetsResponse{
 		Tweets: tweets,
-	})
-	return res, nil
+	}), nil
 }
 
 func (s *TweetsServer) SetTweet(
@@ -78,14 +51,20 @@ func (s *TweetsServer) SetTweet(
 	req *connect.Request[tweetv1.SetTweetRequest],
 ) (*connect.Response[tweetv1.SetTweetResponse], error) {
 	userId, text := req.Msg.UserId, req.Msg.Text
-	tweet, err := createTweet(ctx, s.Client, (userId), text)
+	exits, err := s.Client.User.Query().Where(user.ID(int(userId))).Exist(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	res := connect.NewResponse(&tweetv1.SetTweetResponse{
+	if !exits {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("user does not exist"))
+	}
+	tweet, err := s.Client.Tweet.Create().SetText(text).SetAuthorID(int(userId)).Save(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	return connect.NewResponse(&tweetv1.SetTweetResponse{
 		Response: fmt.Sprintf("tweet %v added", tweet),
-	})
-	return res, nil
+	}), nil
 }
 
 func (s *UserServer) CreateUser(
@@ -93,14 +72,13 @@ func (s *UserServer) CreateUser(
 	req *connect.Request[tweetv1.CreateUserRequest],
 ) (*connect.Response[tweetv1.CreateUserResponse], error) {
 	username := req.Msg.Username
-	user, err := createUser(ctx, s.Client, username)
+	user, err := s.Client.User.Create().SetUsername(username).Save(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	res := connect.NewResponse(&tweetv1.CreateUserResponse{
+	return connect.NewResponse(&tweetv1.CreateUserResponse{
 		Response: fmt.Sprintf("user %v created", user),
-	})
-	return res, nil
+	}), nil
 }
 
 func main() {
@@ -109,10 +87,10 @@ func main() {
 	if err != nil {
 		log.Fatal("failed opening connection to postgres", err)
 	}
-	defer client.Close()
 	if err := client.Schema.Create(context.Background()); err != nil {
 		log.Fatal("failed creating schema resources", err)
 	}
+	defer client.Close()
 	tweetsServer := &TweetsServer{client}
 	userServer := &UserServer{client}
 	mux := http.NewServeMux()

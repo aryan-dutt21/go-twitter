@@ -16,14 +16,13 @@ import (
 type Tweet struct {
 	config `json:"-"`
 	// ID of the ent.
-	ID string `json:"id,omitempty"`
+	ID int `json:"id,omitempty"`
 	// Text holds the value of the "text" field.
 	Text string `json:"text,omitempty"`
-	// AuthorID holds the value of the "author_id" field.
-	AuthorID string `json:"author_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TweetQuery when eager-loading is set.
 	Edges        TweetEdges `json:"edges"`
+	user_tweets  *int
 	selectValues sql.SelectValues
 }
 
@@ -52,8 +51,12 @@ func (*Tweet) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tweet.FieldID, tweet.FieldText, tweet.FieldAuthorID:
+		case tweet.FieldID:
+			values[i] = new(sql.NullInt64)
+		case tweet.FieldText:
 			values[i] = new(sql.NullString)
+		case tweet.ForeignKeys[0]: // user_tweets
+			values[i] = new(sql.NullInt64)
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -70,22 +73,23 @@ func (t *Tweet) assignValues(columns []string, values []any) error {
 	for i := range columns {
 		switch columns[i] {
 		case tweet.FieldID:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field id", values[i])
-			} else if value.Valid {
-				t.ID = value.String
+			value, ok := values[i].(*sql.NullInt64)
+			if !ok {
+				return fmt.Errorf("unexpected type %T for field id", value)
 			}
+			t.ID = int(value.Int64)
 		case tweet.FieldText:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field text", values[i])
 			} else if value.Valid {
 				t.Text = value.String
 			}
-		case tweet.FieldAuthorID:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field author_id", values[i])
+		case tweet.ForeignKeys[0]:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for edge-field user_tweets", value)
 			} else if value.Valid {
-				t.AuthorID = value.String
+				t.user_tweets = new(int)
+				*t.user_tweets = int(value.Int64)
 			}
 		default:
 			t.selectValues.Set(columns[i], values[i])
@@ -130,9 +134,6 @@ func (t *Tweet) String() string {
 	builder.WriteString(fmt.Sprintf("id=%v, ", t.ID))
 	builder.WriteString("text=")
 	builder.WriteString(t.Text)
-	builder.WriteString(", ")
-	builder.WriteString("author_id=")
-	builder.WriteString(t.AuthorID)
 	builder.WriteByte(')')
 	return builder.String()
 }

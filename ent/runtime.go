@@ -18,18 +18,10 @@ func init() {
 	tweetDescText := tweetFields[0].Descriptor()
 	// tweet.TextValidator is a validator for the "text" field. It is called by the builders before save.
 	tweet.TextValidator = tweetDescText.Validators[0].(func(string) error)
-	// tweetDescID is the schema descriptor for id field.
-	tweetDescID := tweetFields[2].Descriptor()
-	// tweet.IDValidator is a validator for the "id" field. It is called by the builders before save.
-	tweet.IDValidator = tweetDescID.Validators[0].(func(string) error)
 	userFields := schema.User{}.Fields()
 	_ = userFields
 	// userDescUsername is the schema descriptor for username field.
 	userDescUsername := userFields[0].Descriptor()
 	// user.UsernameValidator is a validator for the "username" field. It is called by the builders before save.
 	user.UsernameValidator = userDescUsername.Validators[0].(func(string) error)
-	// userDescID is the schema descriptor for id field.
-	userDescID := userFields[1].Descriptor()
-	// user.IDValidator is a validator for the "id" field. It is called by the builders before save.
-	user.IDValidator = userDescID.Validators[0].(func(string) error)
 }

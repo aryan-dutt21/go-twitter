@@ -16,7 +16,6 @@ func (User) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("username").
 			NotEmpty(),
-			field.String("id").Immutable().NotEmpty().Unique(),
 	}
 }
 

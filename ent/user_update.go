@@ -43,14 +43,14 @@ func (uu *UserUpdate) SetNillableUsername(s *string) *UserUpdate {
 }
 
 // AddTweetIDs adds the "tweets" edge to the Tweet entity by IDs.
-func (uu *UserUpdate) AddTweetIDs(ids ...string) *UserUpdate {
+func (uu *UserUpdate) AddTweetIDs(ids ...int) *UserUpdate {
 	uu.mutation.AddTweetIDs(ids...)
 	return uu
 }
 
 // AddTweets adds the "tweets" edges to the Tweet entity.
 func (uu *UserUpdate) AddTweets(t ...*Tweet) *UserUpdate {
-	ids := make([]string, len(t))
+	ids := make([]int, len(t))
 	for i := range t {
 		ids[i] = t[i].ID
 	}
@@ -69,14 +69,14 @@ func (uu *UserUpdate) ClearTweets() *UserUpdate {
 }
 
 // RemoveTweetIDs removes the "tweets" edge to Tweet entities by IDs.
-func (uu *UserUpdate) RemoveTweetIDs(ids ...string) *UserUpdate {
+func (uu *UserUpdate) RemoveTweetIDs(ids ...int) *UserUpdate {
 	uu.mutation.RemoveTweetIDs(ids...)
 	return uu
 }
 
 // RemoveTweets removes "tweets" edges to Tweet entities.
 func (uu *UserUpdate) RemoveTweets(t ...*Tweet) *UserUpdate {
-	ids := make([]string, len(t))
+	ids := make([]int, len(t))
 	for i := range t {
 		ids[i] = t[i].ID
 	}
@@ -124,7 +124,7 @@ func (uu *UserUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := uu.check(); err != nil {
 		return n, err
 	}
-	_spec := sqlgraph.NewUpdateSpec(user.Table, user.Columns, sqlgraph.NewFieldSpec(user.FieldID, field.TypeString))
+	_spec := sqlgraph.NewUpdateSpec(user.Table, user.Columns, sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt))
 	if ps := uu.mutation.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
 			for i := range ps {
@@ -143,7 +143,7 @@ func (uu *UserUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Columns: []string{user.TweetsColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeString),
+				IDSpec: sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
@@ -156,7 +156,7 @@ func (uu *UserUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Columns: []string{user.TweetsColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeString),
+				IDSpec: sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -172,7 +172,7 @@ func (uu *UserUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Columns: []string{user.TweetsColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeString),
+				IDSpec: sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -215,14 +215,14 @@ func (uuo *UserUpdateOne) SetNillableUsername(s *string) *UserUpdateOne {
 }
 
 // AddTweetIDs adds the "tweets" edge to the Tweet entity by IDs.
-func (uuo *UserUpdateOne) AddTweetIDs(ids ...string) *UserUpdateOne {
+func (uuo *UserUpdateOne) AddTweetIDs(ids ...int) *UserUpdateOne {
 	uuo.mutation.AddTweetIDs(ids...)
 	return uuo
 }
 
 // AddTweets adds the "tweets" edges to the Tweet entity.
 func (uuo *UserUpdateOne) AddTweets(t ...*Tweet) *UserUpdateOne {
-	ids := make([]string, len(t))
+	ids := make([]int, len(t))
 	for i := range t {
 		ids[i] = t[i].ID
 	}
@@ -241,14 +241,14 @@ func (uuo *UserUpdateOne) ClearTweets() *UserUpdateOne {
 }
 
 // RemoveTweetIDs removes the "tweets" edge to Tweet entities by IDs.
-func (uuo *UserUpdateOne) RemoveTweetIDs(ids ...string) *UserUpdateOne {
+func (uuo *UserUpdateOne) RemoveTweetIDs(ids ...int) *UserUpdateOne {
 	uuo.mutation.RemoveTweetIDs(ids...)
 	return uuo
 }
 
 // RemoveTweets removes "tweets" edges to Tweet entities.
 func (uuo *UserUpdateOne) RemoveTweets(t ...*Tweet) *UserUpdateOne {
-	ids := make([]string, len(t))
+	ids := make([]int, len(t))
 	for i := range t {
 		ids[i] = t[i].ID
 	}
@@ -309,7 +309,7 @@ func (uuo *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) 
 	if err := uuo.check(); err != nil {
 		return _node, err
 	}
-	_spec := sqlgraph.NewUpdateSpec(user.Table, user.Columns, sqlgraph.NewFieldSpec(user.FieldID, field.TypeString))
+	_spec := sqlgraph.NewUpdateSpec(user.Table, user.Columns, sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt))
 	id, ok := uuo.mutation.ID()
 	if !ok {
 		return nil, &ValidationError{Name: "id", err: errors.New(`ent: missing "User.id" for update`)}
@@ -345,7 +345,7 @@ func (uuo *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) 
 			Columns: []string{user.TweetsColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeString),
+				IDSpec: sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
@@ -358,7 +358,7 @@ func (uuo *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) 
 			Columns: []string{user.TweetsColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeString),
+				IDSpec: sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -374,7 +374,7 @@ func (uuo *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) 
 			Columns: []string{user.TweetsColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeString),
+				IDSpec: sqlgraph.NewFieldSpec(tweet.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

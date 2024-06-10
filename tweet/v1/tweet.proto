@@ -5,20 +5,20 @@ package tweet.v1;
 option go_package = "twitter/gen/tweet/v1;tweetv1";
 
 message GetTweetsRequest {
-  string user_id = 1;
+  int32 user_id = 1;
 }
 
 message GetTweetsResponse {
     message Tweet {
-        string tweet_id = 1;
+        int32 tweet_id = 1;
         string text = 2;
-        string author_id = 3;
+        int32 author_id = 3;
     }
   repeated Tweet tweets = 1;
 }
 
 message SetTweetRequest {
-    string user_id = 1;
+    int32 user_id = 1;
     string text = 2;
 }
 
